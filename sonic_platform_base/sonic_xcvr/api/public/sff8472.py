@@ -7,6 +7,14 @@
 from ...fields import consts
 from ..xcvr_api import XcvrApi
 
+MAX_OFFSET_FOR_A0H_UPPER_PAGE = 255
+MAX_OFFSET_FOR_A0H_LOWER_PAGE = 127
+MAX_PAGE = 255
+MAX_OFFSET_FOR_A2H = 255
+PAGE_SIZE = 128
+PAGE_SIZE_FOR_A0H = 256
+
+
 class Sff8472Api(XcvrApi):
     NUM_CHANNELS = 1
 
@@ -37,7 +45,7 @@ class Sff8472Api(XcvrApi):
             if len > 0:
                 cable_len = len
                 cable_type = type
- 
+
         xcvr_info = {
             "type": serial_id[consts.ID_FIELD],
             "type_abbrv_name": serial_id[consts.ID_ABBRV_FIELD],
@@ -295,3 +303,34 @@ class Sff8472Api(XcvrApi):
 
     def get_power_override_support(self):
         return False
+
+    def is_active_cable(self):
+        return self.xcvr_eeprom.read(consts.SFP_CABLE_TECH_FIELD) == 'Active Cable'
+
+    def get_overall_offset(self, page, offset, size, wire_addr=None):
+        if not wire_addr:
+            raise ValueError("Invalid wire address for sff8472, must a0h or a2h")
+
+        is_active_cable = self.is_active_cable()
+        valid_wire_address = ('a0h', 'a2h') if is_active_cable else ('a0h',)
+        wire_addr = wire_addr.lower()
+        if wire_addr not in valid_wire_address:
+            raise ValueError(f"Invalid wire address {wire_addr} for sff8472, must be {' or '.join(valid_wire_address)}")
+
+        if wire_addr == 'a0h':
+            if page != 0:
+                raise ValueError(f'Invalid page number {page} for wire address {wire_addr}, only page 0 is supported')
+            max_offset = MAX_OFFSET_FOR_A0H_UPPER_PAGE if is_active_cable else MAX_OFFSET_FOR_A0H_LOWER_PAGE
+            if offset < 0 or offset > max_offset:
+                raise ValueError(f'Invalid offset {offset} for wire address {wire_addr}, valid range: [0, {max_offset}]')
+            if size <= 0 or size + offset - 1 > max_offset:
+                raise ValueError(f'Invalid size {size} for wire address {wire_addr}, valid range: [1, {max_offset - offset + 1}]')
+            return offset
+        else:
+            if page < 0 or page > MAX_PAGE:
+                raise ValueError(f'Invalid page number {page} for wire address {wire_addr}, valid range: [0, 255]')
+            if offset < 0 or offset > MAX_OFFSET_FOR_A2H:
+                raise ValueError(f'Invalid offset {offset} for wire address {wire_addr}, valid range: [0, 255]')
+            if size <= 0 or size + offset - 1 > MAX_OFFSET_FOR_A2H:
+                raise ValueError(f'Invalid size {size} for wire address {wire_addr}, valid range: [1, {255 - offset + 1}]')
+            return page * PAGE_SIZE + offset + PAGE_SIZE_FOR_A0H

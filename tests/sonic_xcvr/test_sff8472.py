@@ -289,3 +289,44 @@ class TestSff8472(object):
         result = self.api.get_transceiver_bulk_status()
         assert result == expected
 
+    def test_get_overall_offset(self):
+        self.api.is_active_cable = MagicMock(return_value=True)
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(0, 0, 1)
+
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(0, 0, 1, wire_addr='invalid')
+
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(1, 0, 1, wire_addr='a0h')
+
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(0, -1, 1, wire_addr='A0h')
+
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(0, 256, 1, wire_addr='A0h')
+
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(0, 0, 0, wire_addr='A0h')
+
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(0, 0, 257, wire_addr='A0h')
+
+        assert self.api.get_overall_offset(0, 2, 2, wire_addr='A0h') == 2
+
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(-1, 0, 1, wire_addr='a2h')
+
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(256, 0, 1, wire_addr='a2h')
+
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(0, -1, 1, wire_addr='a2h')
+
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(0, 0, 0, wire_addr='A2h')
+
+        with pytest.raises(ValueError):
+            self.api.get_overall_offset(0, 0, 257, wire_addr='A2h')
+
+        assert self.api.get_overall_offset(0, 2, 2, wire_addr='A2h') == 258
